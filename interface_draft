@@ -1,0 +1,12 @@
+Directory with maps:
+Export maps to:
+
+Game version: [Dropdown with selectors]
+Map size: G EH H XL L M S
+With underground: Y/n
+Number of players: 0
+Number of human players: 0
+[Allies]: Y/n
+Victory conditions: [Dropdown with selectors]
+Lose conditions: [Dropdown with selectors]
+Difficulty: [Dropdown with selectors]
