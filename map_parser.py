@@ -20,11 +20,16 @@ class MapObject:
         self.mapfile.rewind()
         # Get map type:
         self.map_type = self.compare_data(4, constants.MAP_TYPE)
+        #### Insert check of 01/00: if 00, read +5, else +6
+        #### Also check how it will be for non-HotA maps!
+
         # Get map size:
         if self.map_type == "HotA":
             self.mapfile.read(7)
         else:
             self.mapfile.read(1)
+
+        ### Refactor to correct usage of all 4 bytes!
         self.map_size = self.compare_data(1, constants.MAP_SIZE)
         self.mapfile.read(3)
         # Does map have a dungeon?
@@ -34,14 +39,11 @@ class MapObject:
         elif levels == 1:
             self.has_dungeon = True
         # Get map name:
-        length = self.bytes_to_dec(self.mapfile.read(1))
-        self.mapfile.read(3)
+        length = self.bytes_to_dec(self.mapfile.read(4))
         self.map_name = self.mapfile.read(length).decode("Ansi")
         # Get map description:
-        length = self.bytes_to_dec(self.mapfile.read(1))
-        self.mapfile.read(3)
+        length = self.bytes_to_dec(self.mapfile.read(4))
         self.map_description = self.mapfile.read(length).decode("Ansi")
-        ## ToDo: Determine descriptions with length >255
 
     def compare_data(self, length, template_dict):
         prepared_template = {binascii.unhexlify(key): template_dict[key] for key in template_dict}
@@ -53,9 +55,7 @@ class MapObject:
 
     def bytes_to_dec(self, data):
         """Converts bytes to hex, and hex - to decimal integer."""
-        to_hex = binascii.hexlify(data)
+        data_prepared = bytearray(data)
+        data_prepared.reverse()
+        to_hex = binascii.hexlify(data_prepared)
         return int(to_hex, 16)
-
-
-class Dummy:
-    pass
