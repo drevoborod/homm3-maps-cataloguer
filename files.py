@@ -2,11 +2,13 @@ import sys
 import os
 import gzip
 import zlib
+import binascii
 
 import parser
+import constants
 
 
-class IncorrectMapFileError(Exception): pass
+class MapFileError(Exception): pass
 
 
 class FilesAggregator:
@@ -34,21 +36,24 @@ class FilesAggregator:
             except Exception:
                 sys.exit("Cannot create output directory.")
 
-    def maps_dict_prepare(self):
+    def prepare_maps_dict(self):
         self.source_walker()
         for file in self.source_dir_files:
             f = MapFile(file)
             try:
                 f.unpack()
                 f.check()
-            except IncorrectMapFileError as err:
+            except MapFileError:
                 pass
-                #print(err)
             else:
                 self.maps_dict[file] = f.file_object
-            # file_data = parser.MapObject(f.unpack())
-            # file_data.parse_map()
-            # self.maps_dict[file_data.map_name] = file_data.map_contents
+
+    def prepare_maps_data(self):
+        for file in self.maps_dict:
+            file_data = parser.MapObject(self.maps_dict[file])
+            file_data.parse_map()
+            self.maps_dict[file].close()
+            self.maps_dict[file] = file_data.map_contents
 
 
 class MapFile:
@@ -60,17 +65,18 @@ class MapFile:
     def check(self):
         """Check if file is a valid HOMM3 map file. If not, raises IncorrectMapFileError."""
         if not self.file_object:
-            raise IncorrectMapFileError("File not opened yet.")
+            raise MapFileError("File not opened yet.")
         else:
-            pass
-
+            map_type = self.file_object.read(4)
+            if map_type not in map(binascii.unhexlify, [constants.MAP_TYPE[x] for x in constants.MAP_TYPE]):
+                raise MapFileError("Incorrect Heroes map type.")
 
     def unpack(self):
-        with gzip.open(self.filename, "r") as f:
-            try:
-                f.peek(1)
-            except OSError as err:
-                print(err)
-                raise IncorrectMapFileError(err)
-            else:
-                self.file_object = f
+        f = gzip.open(self.filename, "r")
+        try:
+            f.peek(1)
+        except OSError as err:
+            print(err)
+            raise MapFileError(err)
+        else:
+            self.file_object = f
