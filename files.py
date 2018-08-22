@@ -4,7 +4,7 @@ import gzip
 import zlib
 import binascii
 
-import parser
+import map_parser
 import constants
 
 
@@ -49,11 +49,13 @@ class FilesAggregator:
                 self.maps_dict[file] = f.file_object
 
     def prepare_maps_data(self):
-        for file in self.maps_dict:
-            file_data = parser.MapObject(self.maps_dict[file])
+        for key in self.maps_dict:
+            file_data = map_parser.MapObject(self.maps_dict[key])
+            print()
+            print(key)
             file_data.parse_map()
-            self.maps_dict[file].close()
-            self.maps_dict[file] = file_data.map_contents
+            self.maps_dict[key].close()
+            self.maps_dict[key] = file_data
 
 
 class MapFile:
@@ -68,15 +70,14 @@ class MapFile:
             raise MapFileError("File not opened yet.")
         else:
             map_type = self.file_object.read(4)
-            if map_type not in map(binascii.unhexlify, [constants.MAP_TYPE[x] for x in constants.MAP_TYPE]):
-                raise MapFileError("Incorrect Heroes map type.")
+            if map_type not in map(binascii.unhexlify, constants.MAP_TYPE):
+                raise MapFileError("Incorrect Heroes 3 map type.")
 
     def unpack(self):
         f = gzip.open(self.filename, "r")
         try:
             f.peek(1)
         except OSError as err:
-            print(err)
             raise MapFileError(err)
         else:
             self.file_object = f
