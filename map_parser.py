@@ -15,6 +15,7 @@ class MapObject:
         self.map_size = None
         self.has_dungeon = None
         self.map_description = None
+        self.map_difficulty = None
 
     def parse_map(self):
         self.mapfile.rewind()
@@ -41,14 +42,16 @@ class MapObject:
         length = self.bytes_to_dec(4)
         self.map_name = self.mapfile.read(length).decode("Ansi")
         # Get map description:
-        ### ToDo: Support 0-length description.
         length = self.bytes_to_dec(4)
         self.map_description = self.mapfile.read(length).decode("Ansi")
+        # Get map difficulty:
+        self.map_difficulty = self.compare_data(1, constants.DIFFICULTY)
 
         print(self.map_size)
         print(self.map_name)
         print(self.map_description)
         print("Has dungeon:", self.has_dungeon)
+        print(self.map_difficulty)
 
     def compare_data(self, length, template_dict):
         prepared_template = {binascii.unhexlify(key): template_dict[key] for key in template_dict}

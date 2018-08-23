@@ -15,3 +15,11 @@ MAP_SIZE = {
     216: "EH",
     252: "G"
 }
+
+DIFFICULTY = {
+    "00": "Easy",
+    "01": "Normal",
+    "02": "Hard",
+    "03": "Expert",
+    "04": "Impossible"
+}
