@@ -10,19 +10,20 @@ class MapObject:
     def __init__(self, mapfile):
         """Prepares full information about map file. Accepts file object of unpacked map file."""
         self.mapfile = mapfile
-        self.map_name = None
-        self.map_type = None
-        self.map_size = None
-        self.has_dungeon = None
-        self.map_description = None
-        self.map_difficulty = None
+        self.map_name = ""
+        self.map_type = ""
+        self.map_size = 0
+        self.has_dungeon: bool = None
+        self.map_description = ""
+        self.map_difficulty = ""
+        self.total_players = 0
+        self.ai_players = 0
+        self.human_players = 0
 
     def parse_map(self):
         self.mapfile.rewind()
         # Get map type:
         self.map_type = self.compare_data(4, constants.MAP_TYPE)
-        #### Insert check of 01/00: if 00, read +5, else +6
-        #### Also check how it will be for non-HotA maps!
         # Determine where to start reading next data:
         hero_exists = self.bytes_to_dec(1)
         if self.map_type == "HotA":
@@ -46,12 +47,35 @@ class MapObject:
         self.map_description = self.mapfile.read(length).decode("Ansi")
         # Get map difficulty:
         self.map_difficulty = self.compare_data(1, constants.DIFFICULTY)
+        #Get players:
+        self.player_attributes()
+        # Skip heroes parameters:
+        #self.mapfile.read(n)
+        # Get victory conditions:
+        self.victory_conditions()
+        # Get loss conditions:
+        self.loss_conditions()
+        # Get teams:
+        self.teams()
 
         print(self.map_size)
         print(self.map_name)
         print(self.map_description)
         print("Has dungeon:", self.has_dungeon)
         print(self.map_difficulty)
+
+    def player_attributes(self):
+        ### Result should be: how many humans and how many computers exist, and also total number of players.
+        pass
+
+    def victory_conditions(self):
+        pass
+
+    def loss_conditions(self):
+        pass
+
+    def teams(self):
+        pass
 
     def compare_data(self, length, template_dict):
         prepared_template = {binascii.unhexlify(key): template_dict[key] for key in template_dict}
