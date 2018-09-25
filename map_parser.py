@@ -13,7 +13,7 @@ class MapObject:
         self.map_name = ""
         self.map_type = ""
         self.map_size = 0
-        self.has_dungeon: bool = None
+        self.underground_exists: bool = None
         self.map_description = ""
         self.map_difficulty = ""
         self.total_players = 0
@@ -36,9 +36,9 @@ class MapObject:
         # Does map have a dungeon?
         levels = self.bytes_to_dec(1)
         if levels == 0:
-            self.has_dungeon = False
+            self.underground_exists = False
         elif levels == 1:
-            self.has_dungeon = True
+            self.underground_exists = True
         # Get map name:
         length = self.bytes_to_dec(4)
         self.map_name = self.mapfile.read(length).decode("Ansi")
@@ -61,7 +61,7 @@ class MapObject:
         print(self.map_size)
         print(self.map_name)
         print(self.map_description)
-        print("Has dungeon:", self.has_dungeon)
+        print("Has dungeon:", self.underground_exists)
         print(self.map_difficulty)
 
     def player_attributes(self):
