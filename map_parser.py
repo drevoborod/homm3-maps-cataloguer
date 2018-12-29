@@ -23,40 +23,34 @@ class MapObject:
     def parse_map(self):
         self.mapfile.rewind()
         # Get map type:
-        self.map_type = self.compare_data(4, constants.MAP_TYPE)
+        self._get_map_type()
         # Determine where to start reading next data:
-        hero_exists = self.bytes_to_dec(1)
+        hero_exists = self._bytes_to_dec(1)
         if self.map_type == "HotA":
             if hero_exists:
                 self.mapfile.read(6)
             else:
                 self.mapfile.read(4)
         # Get map size:
-        self.map_size = self.bytes_to_dec(4)
+        self._get_map_size()
         # Does map have a dungeon?
-        levels = self.bytes_to_dec(1)
-        if levels == 0:
-            self.underground_exists = False
-        elif levels == 1:
-            self.underground_exists = True
+        self._get_dungeon()
         # Get map name:
-        length = self.bytes_to_dec(4)
-        self.map_name = self.mapfile.read(length).decode("Ansi")
+        self._get_map_name()
         # Get map description:
-        length = self.bytes_to_dec(4)
-        self.map_description = self.mapfile.read(length).decode("Ansi")
+        self._get_map_description()
         # Get map difficulty:
-        self.map_difficulty = self.compare_data(1, constants.DIFFICULTY)
+        self._get_map_difficulty()
         #Get players:
-        self.player_attributes()
+        self._get_player_attributes()
         # Skip heroes parameters:
         #self.mapfile.read(n)
         # Get victory conditions:
-        self.victory_conditions()
+        self._get_victory_conditions()
         # Get loss conditions:
-        self.loss_conditions()
+        self._get_loss_conditions()
         # Get teams:
-        self.teams()
+        self._get_teams()
 
         print(self.map_size)
         print(self.map_name)
@@ -64,20 +58,44 @@ class MapObject:
         print("Has dungeon:", self.underground_exists)
         print(self.map_difficulty)
 
-    def player_attributes(self):
+    def _get_map_type(self):
+        self. map_type = self._compare_data(4, constants.MAP_TYPE)
+
+    def _get_map_size(self):
+        self.map_size = self._bytes_to_dec(4)
+
+    def _get_dungeon(self):
+        levels = self._bytes_to_dec(1)
+        if levels == 0:
+            self.underground_exists = False
+        elif levels == 1:
+            self.underground_exists = True
+
+    def _get_map_name(self):
+        length = self._bytes_to_dec(4)
+        self.map_name = self.mapfile.read(length).decode("Ansi")
+
+    def _get_map_description(self):
+        length = self._bytes_to_dec(4)
+        self.map_description = self.mapfile.read(length).decode("Ansi")
+
+    def _get_map_difficulty(self):
+        self.map_difficulty = self._compare_data(1, constants.DIFFICULTY)
+
+    def _get_player_attributes(self):
         ### Result should be: how many humans and how many computers exist, and also total number of players.
         pass
 
-    def victory_conditions(self):
+    def _get_victory_conditions(self):
         pass
 
-    def loss_conditions(self):
+    def _get_loss_conditions(self):
         pass
 
-    def teams(self):
+    def _get_teams(self):
         pass
 
-    def compare_data(self, length, template_dict):
+    def _compare_data(self, length, template_dict):
         prepared_template = {binascii.unhexlify(key): template_dict[key] for key in template_dict}
         data = self.mapfile.read(length)
         if data not in prepared_template:
@@ -85,7 +103,7 @@ class MapObject:
         else:
             return prepared_template[data]
 
-    def bytes_to_dec(self, length):
+    def _bytes_to_dec(self, length):
         """Converts bytes to hex, and hex - to decimal integer."""
         data = bytearray(self.mapfile.read(length))
         data.reverse()
