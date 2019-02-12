@@ -20,5 +20,9 @@ for m in maps_cataloguer.maps:
     print("size:", maps_cataloguer.maps[m].size)
     print("has dungeon:", maps_cataloguer.maps[m].dungeon)
     print("difficulty:", maps_cataloguer.maps[m].difficulty)
+    players_dict = maps_cataloguer.maps[m].players
+    for key in players_dict:
+        #if key != "players":
+        print(key, players_dict[key])
     print()
 print(len(maps_cataloguer.maps))

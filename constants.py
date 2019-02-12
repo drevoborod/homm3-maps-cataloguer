@@ -23,3 +23,5 @@ DIFFICULTY = {
     "03": "Expert",
     "04": "Impossible"
 }
+
+PLAYERS = ['Red', 'Blue', 'Tan', 'Green', 'Orange', 'Purple', 'Teal', 'Pink']

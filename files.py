@@ -56,6 +56,7 @@ class MapFile:
         self.dungeon: bool = None
         self.description = None
         self._difficulty = None
+        self._players = None
         self._total_players = None
         self._ai_players = None
         self._human_players = None
@@ -148,10 +149,26 @@ class MapFile:
             self._difficulty = self._locate_data(1, constants.DIFFICULTY)
         return self._difficulty
 
-    def _get_player_attributes(self):
-        data = self._read(10, offset=self._offset + 1)
-        ### Result should be: how many humans and how many computers exist, and also total number of players.
-        pass
+    @property
+    def players(self):
+        ### Works correctly only for first player!
+        ### Need to implement determining of actual data length for every player.
+        if self._players is None:
+            players = dict()
+            offset = self._offset + 1
+            for player in constants.PLAYERS:
+                is_human = self._bytes_to_dec(1, offset=offset + 1)
+                is_ai = self._bytes_to_dec(1, offset=offset + 2)
+                players[player] = dict()
+                players[player]["is_human"] = is_human
+                players[player]["is_ai"] = is_ai
+                offset += 14
+            self._players = players
+            self.total_players = len([x for x in players if players[x]["is_human"] or players[x]["is_ai"]])
+            self.human_players = len([x for x in players if players[x]["is_human"]])
+            self.ai_players = len([x for x in players if players[x]["is_ai"]])
+        return {"players": self._players, "total": self._total_players,
+                "human": self._human_players, "ai": self._ai_players}
 
     def _get_victory_conditions(self):
         pass
