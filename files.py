@@ -164,9 +164,9 @@ class MapFile:
                 players[player]["is_ai"] = is_ai
                 offset += 14
             self._players = players
-            self.total_players = len([x for x in players if players[x]["is_human"] or players[x]["is_ai"]])
-            self.human_players = len([x for x in players if players[x]["is_human"]])
-            self.ai_players = len([x for x in players if players[x]["is_ai"]])
+            self._total_players = len([x for x in players if players[x]["is_human"] or players[x]["is_ai"]])
+            self._human_players = len([x for x in players if players[x]["is_human"]])
+            self._ai_players = len([x for x in players if players[x]["is_ai"]])
         return {"players": self._players, "total": self._total_players,
                 "human": self._human_players, "ai": self._ai_players}
 
