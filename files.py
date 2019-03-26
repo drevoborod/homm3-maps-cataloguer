@@ -46,7 +46,8 @@ class FilesAggregator:
 
 
 class MapFile:
-    """Unpack map file and return its contents. Write map file to another place if necessary."""
+    """Unpack map file and return its contents.
+    Write map file to another place if necessary."""
     def __init__(self, filename):
         self._filename = filename
         self._mapfile = None
@@ -151,7 +152,7 @@ class MapFile:
 
     @property
     def players(self):
-        ### Works correctly only for first player!
+        ### Works correctly for first player only!
         ### Need to implement determining of actual data length for every player.
         if self._players is None:
             players = dict()

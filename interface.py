@@ -1,7 +1,9 @@
-import PyQt5
+from PyQt5.QtWidgets import *
+from PyQt5.QtGui import QPalette, QIntValidator
+from PyQt5.QtCore import Qt
 
 import files
 
 
-class Main:
+class MainWindow:
     pass
