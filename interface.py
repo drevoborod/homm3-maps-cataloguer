@@ -23,8 +23,8 @@ class MainWindow(QWidget):
         source_button = Button("Maps source directory...", self)
         source_button.clicked.connect(self.select_directory)
         destination_button = Button("Maps save directory...", self)
+        destination_button.setFixedWidth(source_button.minimumSizeHint().width())
         destination_button.clicked.connect(self.select_directory)
-        destination_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.source_path_entry = QLineEdit(self)
         self.destination_path_entry = QLineEdit(self)
         filter_frame = QFrame(self)
@@ -74,8 +74,6 @@ class MainWindow(QWidget):
         main_grid.addWidget(quit_button, 4, 1, alignment=Qt.AlignRight)
 
         self.setLayout(main_grid)
-        self.show()
-
 
     def export(self):
         pass
@@ -84,7 +82,8 @@ class MainWindow(QWidget):
         res = QFileDialog.getExistingDirectory(self, "Source directory")[0]
 
 
-
-app = QApplication([])
-main = MainWindow(app.exit)
-app.exec_()
+def start():
+    app = QApplication([])
+    gui = MainWindow(app.exit)
+    gui.show()
+    app.exec_()

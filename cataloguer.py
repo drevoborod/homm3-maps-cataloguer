@@ -24,4 +24,4 @@ if __name__ == "__main__":
     module_names = ["PyQt5"]
     check_interpreter()
     check_deps(module_names)
-    interface.Main()
+    interface.start()
