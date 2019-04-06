@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-import files
-
+from src import files
 
 #maps_location = "C:\GOG Games\HoMM 3 Complete\Maps\Test"
 maps_location = "/home/user/test/Maps/"

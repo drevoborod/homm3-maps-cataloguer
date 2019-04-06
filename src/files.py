@@ -16,21 +16,31 @@ class FilesAggregator:
         self.path = input_path
         self.maps = {}
         self.broken_maps = []
-        self._prepare()
+        #self._prepare()
 
-    def _prepare(self):
-        """Create a list of files in source directory."""
+    def get_files(self):
+        """Create a list of files from source directory."""
+        files = []
         with os.scandir(self.path) as path:
             for element in path:
                 if element.is_file():
-                    try:
-                        file = MapFile(element.path)
-                    except MapFileError:
-                        pass
-                    except MapContentsError:
-                        self.broken_maps.append(element.path)
-                    else:
-                        self.maps[element.path] = file
+                    files.append(element.path)
+        return files
+
+    def prepare(self, files=None):
+        """Create a list of map files from source directory."""
+        if files is None:
+            files = self.get_files()
+        for path in files:
+            try:
+                file = MapFile(path)
+            except MapFileError:
+                pass
+            except MapContentsError:
+                self.broken_maps.append(path)
+            else:
+                self.maps[path] = file
+                yield file
 
     @staticmethod
     def _makedir(path):

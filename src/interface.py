@@ -1,8 +1,6 @@
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QPalette, QIntValidator
 from PyQt5.QtCore import Qt
-
-import files
+from PyQt5.QtGui import QPalette
 
 
 class Button(QPushButton):
@@ -11,22 +9,48 @@ class Button(QPushButton):
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
 
+class ProgressWindow(QDialog):
+    def __init__(self, parent, dirpath):
+        super().__init__(parent)
+        self.init_ui(dirpath)
+
+    def init_ui(self, directory):
+        self.setWindowTitle("Opening {}".format(directory))
+        self.progress = QProgressBar(self)
+        self.progress.setGeometry(0, 0, 600, 30)
+        self.show()
+        self.setFixedSize(self.width(), self.height())
+
+    def set_maximum(self, value):
+        self.maximum = value
+        self.progress.setMaximum(self.maximum)
+
+    def set_value(self, value):
+        self.progress.setValue(value)
+        if value == self.maximum:
+            self.destroy()
+
+
 class MainWindow(QWidget):
-    def __init__(self, exit_callback):
+    def __init__(self, exit_callback, aggregator_class):
         super().__init__()
+        self.aggregator = aggregator_class
         self.exit = exit_callback
+        self.maps_list = []
         self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle("Heroes 3 maps cataloguer")
         main_grid = QGridLayout()
         source_button = Button("Maps source directory...", self)
-        source_button.clicked.connect(self.select_directory)
+        source_button.clicked.connect(self.select_source_directory)
         destination_button = Button("Maps save directory...", self)
         destination_button.setFixedWidth(source_button.minimumSizeHint().width())
-        destination_button.clicked.connect(self.select_directory)
+        destination_button.clicked.connect(self.select_destination_directory)
         self.source_path_entry = QLineEdit(self)
         self.destination_path_entry = QLineEdit(self)
+        for w in (self.source_path_entry, self.destination_path_entry):
+            self.disable_entry(w)
         filter_frame = QFrame(self)
         self.maps_table = QTableWidget(self)
         export_button = Button("Move selected", self)
@@ -75,15 +99,45 @@ class MainWindow(QWidget):
 
         self.setLayout(main_grid)
 
+    def disable_entry(self, widget):
+        back_colour = self.palette().color(QPalette.Background)
+        palette = QPalette()
+        palette.setColor(widget.backgroundRole(), back_colour)
+        widget.setPalette(palette)
+        widget.setReadOnly(True)
+
     def export(self):
         pass
 
-    def select_directory(self):
-        res = QFileDialog.getExistingDirectory(self, "Source directory")[0]
+    def _select_directory(self, title):
+        res = QFileDialog.getExistingDirectory(self, title)
+        if res:
+            return res
+
+    def select_source_directory(self):
+        self.source_dir = self._select_directory("Source directory")
+
+    def select_destination_directory(self):
+        self.destination_dir = self._select_directory("Destination directory")
+
+    def collect_maps(self):
+        """"""
+        if self.source_dir:
+            progress = ProgressWindow(self, self.source_dir)
+            files_aggregator = self.aggregator(self.source_dir)
+            files_list = files_aggregator.get_files()
+            progress.set_maximum(len(files_list))
+            count = 0
+            for parsed_map in files_aggregator.prepare():
+                count += 1
+                progress.set_value(count)
+                self.maps_list.append(parsed_map)
+        #progress.destroy()
 
 
-def start():
+
+def start(aggregator_class):
     app = QApplication([])
-    gui = MainWindow(app.exit)
+    gui = MainWindow(app.exit, aggregator_class)
     gui.show()
     app.exec_()
