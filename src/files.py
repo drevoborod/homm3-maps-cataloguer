@@ -1,13 +1,17 @@
 import sys
 import os
+import shutil
 import gzip
 import binascii
+from collections import namedtuple
 
 import constants
 
 
 class MapFileError(Exception): pass
 class MapContentsError(Exception): pass
+class SourceFileDeletionError(Exception): pass
+class DestinationError(Exception): pass
 
 
 class FilesAggregator:
@@ -16,7 +20,6 @@ class FilesAggregator:
         self.path = input_path
         self.maps = {}
         self.broken_maps = []
-        #self._prepare()
 
     def get_files(self):
         """Create a list of files from source directory."""
@@ -43,16 +46,34 @@ class FilesAggregator:
                 yield file
 
     @staticmethod
-    def _makedir(path):
-        if not os.path.exists(path):
+    def copy(source, destination, overwrite=False):
+        """By default, does not overwrite existing file."""
+        if not overwrite:
+            if not os.path.exists(os.path.join(destination, os.path.split(source)[-1])):
+                FilesAggregator.copy(source, destination, True)
+        else:
             try:
-                os.mkdir(path)
-            except Exception:
-                sys.exit("Cannot create output directory.")
+                shutil.copy2(source, destination)
+            except PermissionError:
+                raise DestinationError("Unable to copy file: no permission.")
 
-    def move(self):
-        """Move file to new place."""
-        pass
+    @staticmethod
+    def move(source, destination, overwrite=False):
+        """By default, does not overwrite existing file."""
+        try:
+            shutil.move(source, destination)
+        except shutil.Error:  # file exists in destination
+            if overwrite:
+                os.remove(os.path.join(destination, os.path.split(source)[-1]))
+                FilesAggregator.move(source, destination)
+        except PermissionError as err:  # no X or W permission on source or destination dir
+            error_message = str(err)
+            if error_message.rstrip("'").endswith(source):
+                raise SourceFileDeletionError(
+                    "File copied successfully, but "
+                    "unable to delete source file.")
+            elif destination in error_message:
+                raise DestinationError("Unable to move file: no permission.")
 
 
 class MapFile:
@@ -73,6 +94,10 @@ class MapFile:
         self._human_players = None
         self._offset = 0
         self._parse_main_data()
+
+    @property
+    def path(self):
+        return self._filename
 
     def _unpack(self):
         f = gzip.open(self._filename)
@@ -121,7 +146,7 @@ class MapFile:
                 self._offset = 4
         # Get map size:
         self._offset += 5
-        self.size = self._map_size = self._bytes_to_dec(4)
+        self.size = self._bytes_to_dec(4)
         # Does map have a dungeon?
         self._offset += 4
         levels = self._bytes_to_dec(1)
@@ -178,8 +203,8 @@ class MapFile:
             self._total_players = len([x for x in players if players[x]["is_human"] or players[x]["is_ai"]])
             self._human_players = len([x for x in players if players[x]["is_human"]])
             self._ai_players = len([x for x in players if players[x]["is_ai"]])
-        return {"players": self._players, "total": self._total_players,
-                "human": self._human_players, "ai": self._ai_players}
+        res = namedtuple("Players", ["players", "total", "humans", "ai"])
+        return res(self._players, self._total_players, self._human_players, self._ai_players)
 
     def _get_victory_conditions(self):
         pass

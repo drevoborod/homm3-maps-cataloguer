@@ -1,6 +1,10 @@
+from collections import namedtuple
+
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette
+from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QPalette, QBrush, QColor, QIcon
+
+import constants
 
 
 class Button(QPushButton):
@@ -27,8 +31,103 @@ class ProgressWindow(QDialog):
 
     def set_value(self, value):
         self.progress.setValue(value)
-        if value == self.maximum:
-            self.destroy()
+
+
+class Filter(QFrame):
+    def __init__(self, parent, callable):
+        super().__init__(parent)
+        self.callable = callable
+        self.init_ui()
+
+    def init_ui(self):
+        self.setFrameShape(QFrame.Panel)
+        self.game_version_selection = QComboBox(self)
+        self.game_version_selection.addItems(constants.MAP_TYPE.values())
+        self.size_selection = QComboBox(self)
+        self.size_selection.addItems(constants.MAP_SIZE.values())
+        self.map_name_entry = QLineEdit(self)
+        self.description_entry = QLineEdit(self)
+
+        filter_mode_frame = QFrame(self)
+        filter_mode_frame.setFrameShape(QFrame.Panel)
+
+        search_mode_label = QLabel("Search mode", filter_mode_frame)
+        font = search_mode_label.font()
+        font.setPointSize(font.pointSize() + 1)
+        search_mode_label.setFont(font)
+        self.filter_inclusive_button = QRadioButton("Inclusive (AND)",
+                                                    filter_mode_frame)
+        self.filter_inclusive_button.setChecked(True)
+        self.filter_exclusive_button = QRadioButton("Exclusive (OR)",
+                                                    filter_mode_frame)
+
+        filter_mode_layout = QVBoxLayout()
+        filter_mode_layout.addWidget(search_mode_label,
+                                     alignment=Qt.AlignCenter)
+        filter_mode_layout.addWidget(self.filter_inclusive_button)
+        filter_mode_layout.addWidget(self.filter_exclusive_button)
+
+        filter_mode_frame.setLayout(filter_mode_layout)
+
+        search_button = QToolButton(self)
+        search_button.setText("Search")
+        search_button.clicked.connect(self.callable)
+        search_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        search_button.setIcon(QIcon('magnifier.png'))
+        search_button.setIconSize(QSize(50, 50))
+        search_button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        filter_area_grid = QGridLayout()
+
+        filter_header_frame = QFrame(self)
+        filter_header_frame_layout = QHBoxLayout()
+        filter_header = QLabel("Filter", filter_header_frame)
+        font = filter_header.font()
+        font.setPointSize(font.pointSize() + 2)
+        font.setBold(True)
+        filter_header.setFont(font)
+        filter_header_frame_layout.addWidget(filter_header,
+                                             alignment=Qt.AlignCenter)
+        filter_header_frame.setLayout(filter_header_frame_layout)
+
+        filter_area_grid.addWidget(filter_header_frame, 0, 0, 1, 6)
+        filter_area_grid.addWidget(QLabel("Game version:", self), 1, 0)
+        filter_area_grid.addWidget(self.game_version_selection, 2, 0)
+        filter_area_grid.addWidget(QLabel("Map size:"), 3, 0)
+        filter_area_grid.addWidget(self.size_selection, 4, 0)
+        filter_area_grid.addWidget(QLabel("Map name contains:"), 2, 1,
+                                   alignment=Qt.AlignRight)
+        filter_area_grid.addWidget(QLabel("Description contains:"), 4, 1,
+                                   alignment=Qt.AlignRight)
+        filter_area_grid.addWidget(self.map_name_entry, 2, 2)
+        filter_area_grid.addWidget(self.description_entry, 4, 2)
+        filter_area_grid.addWidget(filter_mode_frame, 1, 3, 4, 1)
+        filter_area_grid.addWidget(search_button, 1, 4, 4, 1)
+
+        self.setLayout(filter_area_grid)
+
+    def _get_filter_values(self):
+        res = namedtuple("FilterValues", "type,size,name,descr")
+        return res(self.game_version_selection.currentText(),
+                   self.size_selection.currentText(),
+                   self.map_name_entry.text(), self.description_entry.text())
+
+    def apply(self, maps_list):
+        filter_values = self._get_filter_values()
+        res = []
+        for map_item in maps_list:
+            if self.filter_inclusive_button.isChecked():
+                if (map_item.type == filter_values.type
+                        and constants.MAP_SIZE[map_item.size] == filter_values.size
+                        and filter_values.name.lower() in map_item.name.lower()
+                        and filter_values.descr.lower() in map_item.description.lower()):
+                    res.append(map_item)
+            elif self.filter_exclusive_button.isChecked():
+                if (map_item.type == filter_values.type
+                        or constants.MAP_SIZE[map_item.size] == filter_values.size
+                        or filter_values.name.lower() in map_item.name.lower()
+                        or filter_values.descr.lower() in map_item.description.lower()):
+                    res.append(map_item)
+        return res
 
 
 class MainWindow(QWidget):
@@ -37,65 +136,50 @@ class MainWindow(QWidget):
         self.aggregator = aggregator_class
         self.exit = exit_callback
         self.maps_list = []
+        self.filtered_maps_list = []
+        self.selected_map_files = set()
+        self.source_dir = None
+        self.destination_dir = None
         self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle("Heroes 3 maps cataloguer")
         main_grid = QGridLayout()
-        source_button = Button("Maps source directory...", self)
+
+        source_frame = QFrame(self)
+        source_button = Button("Import maps from...", source_frame)
         source_button.clicked.connect(self.select_source_directory)
-        destination_button = Button("Maps save directory...", self)
-        destination_button.setFixedWidth(source_button.minimumSizeHint().width())
-        destination_button.clicked.connect(self.select_destination_directory)
-        self.source_path_entry = QLineEdit(self)
-        self.destination_path_entry = QLineEdit(self)
-        for w in (self.source_path_entry, self.destination_path_entry):
-            self.disable_entry(w)
-        filter_frame = QFrame(self)
+        self.source_path_entry = QLineEdit(source_frame)
+        self.disable_entry(self.source_path_entry)
+
+        source_area_grid = QHBoxLayout()
+        source_area_grid.addWidget(source_button)
+        source_area_grid.addWidget(self.source_path_entry)
+
+        source_frame.setLayout(source_area_grid)
+
+        self.filter = Filter(self, self.fill_table)
+
         self.maps_table = QTableWidget(self)
-        export_button = Button("Move selected", self)
-        export_button.clicked.connect(self.export)
+        self.move_checkbox = QCheckBox(self)
+        self.move_checkbox.setText(
+            "Remove selected maps from source directory on export")
+        self.overwrite_checkbox = QCheckBox(self)
+        self.overwrite_checkbox.setText(
+            "Overwrite existing files in target directory")
+        self.export_button = Button("Export maps", self)
+        self.export_button.clicked.connect(self.export)
+        self.export_button.setEnabled(False)
         quit_button = Button("Quit", self)
         quit_button.clicked.connect(self.exit)
 
-        game_version_selection = QComboBox(filter_frame)
-        size_selection = QComboBox(filter_frame)
-        self.map_name_search_entry = QLineEdit(filter_frame)
-        self.description_search_entry = QLineEdit(filter_frame)
-        self.filter_inclusive_button = QRadioButton(filter_frame)
-        self.filter_exclusive_button = QRadioButton(filter_frame)
-        search_button = Button("Search", filter_frame)
-        search_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-
-        filter_area_grid = QGridLayout()
-        filter_area_grid.addWidget(QLabel("Filter", filter_frame), 0, 0, 1, 6,
-                                   alignment=Qt.AlignCenter)
-        filter_area_grid.addWidget(QLabel("Game version:", filter_frame), 1, 0)
-        filter_area_grid.addWidget(game_version_selection, 2, 0)
-        filter_area_grid.addWidget(QLabel("Map size:"), 3, 0)
-        filter_area_grid.addWidget(size_selection, 4, 0)
-        filter_area_grid.addWidget(QLabel("Map name contains"), 2, 1,
-                                   alignment=Qt.AlignRight)
-        filter_area_grid.addWidget(QLabel("Description contains"), 4, 1,
-                                   alignment=Qt.AlignRight)
-        filter_area_grid.addWidget(self.map_name_search_entry, 2, 2)
-        filter_area_grid.addWidget(self.description_search_entry, 4, 2)
-        filter_area_grid.addWidget(self.filter_inclusive_button, 2, 3)
-        filter_area_grid.addWidget(QLabel("Search mode"), 3, 3,
-                                   alignment=Qt.AlignCenter)
-        filter_area_grid.addWidget(self.filter_exclusive_button, 4, 3)
-        filter_area_grid.addWidget(search_button, 1, 5, 4, 1)
-
-        filter_frame.setLayout(filter_area_grid)
-
-        main_grid.addWidget(source_button, 0, 0)
-        main_grid.addWidget(self.source_path_entry, 0, 1)
-        main_grid.addWidget(destination_button, 1, 0)
-        main_grid.addWidget(self.destination_path_entry, 1, 1)
-        main_grid.addWidget(filter_frame, 2, 0, 1, 2)
-        main_grid.addWidget(self.maps_table, 3, 0, 1, 2)
-        main_grid.addWidget(export_button, 4, 0, alignment=Qt.AlignLeft)
-        main_grid.addWidget(quit_button, 4, 1, alignment=Qt.AlignRight)
+        main_grid.addWidget(source_frame, 0, 0, 1, 2)
+        main_grid.addWidget(self.filter, 1, 0, 1, 2)
+        main_grid.addWidget(self.maps_table, 2, 0, 1, 2)
+        main_grid.addWidget(self.move_checkbox, 3, 0)
+        main_grid.addWidget(self.overwrite_checkbox, 4, 0)
+        main_grid.addWidget(self.export_button, 5, 0, alignment=Qt.AlignLeft)
+        main_grid.addWidget(quit_button, 5, 1, alignment=Qt.AlignRight)
 
         self.setLayout(main_grid)
 
@@ -107,7 +191,15 @@ class MainWindow(QWidget):
         widget.setReadOnly(True)
 
     def export(self):
-        pass
+        directory = self._select_directory("Destination directory")
+        if directory:
+            self.destination_dir = directory
+            if self.move_checkbox.isChecked():
+                func = self.aggregator.move
+            else:
+                func = self.aggregator.copy
+            for file in self.selected_map_files:
+                func(file, self.destination_dir, self.overwrite_checkbox.isChecked())
 
     def _select_directory(self, title):
         res = QFileDialog.getExistingDirectory(self, title)
@@ -115,28 +207,75 @@ class MainWindow(QWidget):
             return res
 
     def select_source_directory(self):
-        self.source_dir = self._select_directory("Source directory")
-
-    def select_destination_directory(self):
-        self.destination_dir = self._select_directory("Destination directory")
+        source_dir = self._select_directory("Source directory")
+        if source_dir:
+            self.source_dir = source_dir
+            self.source_path_entry.setText(self.source_dir)
+            self.collect_maps()
+            self.fill_table()
 
     def collect_maps(self):
         """"""
-        if self.source_dir:
-            progress = ProgressWindow(self, self.source_dir)
-            files_aggregator = self.aggregator(self.source_dir)
-            files_list = files_aggregator.get_files()
-            progress.set_maximum(len(files_list))
-            count = 0
-            for parsed_map in files_aggregator.prepare():
-                count += 1
-                progress.set_value(count)
-                self.maps_list.append(parsed_map)
-        #progress.destroy()
+        progress = ProgressWindow(self, self.source_dir)
+        files_aggregator = self.aggregator(self.source_dir)
+        files_list = files_aggregator.get_files()
+        progress.set_maximum(len(files_list))
+        count = 0
+        for parsed_map in files_aggregator.prepare():
+            count += 1
+            progress.set_value(count)
+            self.maps_list.append(parsed_map)
+        progress.destroy()
 
+    def fill_table(self):
+        self.filtered_maps_list = self.filter.apply(self.maps_list)
+        self.maps_table.setRowCount(len(self.filtered_maps_list))
+        self.maps_table.setColumnCount(8)
+        self.maps_table.setHorizontalHeaderLabels(
+            ["", "Name", "Description", "Size", "Type", "Has underground?",
+             "Total players", "Human players"]
+        )
+        font = self.maps_table.horizontalHeader().font()
+        font.setBold(True)
+        self.maps_table.horizontalHeader().setFont(font)
+        self.maps_table.setSelectionMode(QAbstractItemView.NoSelection)
+        ## Get desired cell contents:
+        ## self.maps_table.item(1, 3)
+        for row_number, row in enumerate(self.filtered_maps_list):
+            row_checker = QCheckBox(self.maps_table)
+            row_checker.stateChanged.connect(
+                lambda x, y=row_checker, z=row_number:
+                self.select_map(checkbutton=y, number=z))
+            self.maps_table.setCellWidget(row_number, 0, row_checker)
+            self.maps_table.setItem(row_number, 1, TableCell(row.name))
+            self.maps_table.setItem(row_number, 2, TableCell(row.description))
+            self.maps_table.setItem(row_number, 3, TableCell(str(row.size)))
+            self.maps_table.setItem(row_number, 4, TableCell(row.type))
+            self.maps_table.setItem(row_number, 5, TableCell(row.dungeon))
+            self.maps_table.setItem(row_number, 6, TableCell(str(row.players.total)))
+            self.maps_table.setItem(row_number, 7, TableCell(str(row.players.humans)))
+
+    def select_map(self, checkbutton, number):
+        if checkbutton.isChecked():
+            self.selected_map_files.add(self.filtered_maps_list[number].path)
+        else:
+            self.selected_map_files.discard(self.filtered_maps_list[number].path)
+        self.export_button.setEnabled(True if len(self.selected_map_files) > 0
+                                      else False)
+
+
+class TableCell(QTableWidgetItem):
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.setFlags(Qt.ItemIsSelectable)
+        self.setForeground(QBrush(QColor(0, 0, 0)))
+
+
+app = None
 
 
 def start(aggregator_class):
+    global app
     app = QApplication([])
     gui = MainWindow(app.exit, aggregator_class)
     gui.show()
