@@ -131,7 +131,12 @@ class MapFile:
         data = bytearray(self._read(length, offset=offset))
         data.reverse()
         to_hex = binascii.hexlify(data)
-        return int(to_hex, 16)
+        ### Debug
+        try:
+            return int(to_hex, 16)
+        except Exception as err:
+            print(str(err) + self.path)
+            sys.exit()
 
     def _parse_main_data(self):
         self._unpack()
