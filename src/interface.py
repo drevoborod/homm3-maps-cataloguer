@@ -42,32 +42,12 @@ class Filter(QFrame):
     def init_ui(self):
         self.setFrameShape(QFrame.Panel)
         self.game_version_selection = QComboBox(self)
-        self.game_version_selection.addItems(constants.MAP_TYPE.values())
+        self.game_version_selection.addItems(["Any"] +
+                                             list(constants.MAP_TYPE.values()))
         self.size_selection = QComboBox(self)
-        self.size_selection.addItems(constants.MAP_SIZE.values())
+        self.size_selection.addItems(["Any"] + list(constants.MAP_SIZE.values()))
         self.map_name_entry = QLineEdit(self)
         self.description_entry = QLineEdit(self)
-
-        filter_mode_frame = QFrame(self)
-        filter_mode_frame.setFrameShape(QFrame.Panel)
-
-        search_mode_label = QLabel("Search mode", filter_mode_frame)
-        font = search_mode_label.font()
-        font.setPointSize(font.pointSize() + 1)
-        search_mode_label.setFont(font)
-        self.filter_inclusive_button = QRadioButton("Inclusive (AND)",
-                                                    filter_mode_frame)
-        self.filter_inclusive_button.setChecked(True)
-        self.filter_exclusive_button = QRadioButton("Exclusive (OR)",
-                                                    filter_mode_frame)
-
-        filter_mode_layout = QVBoxLayout()
-        filter_mode_layout.addWidget(search_mode_label,
-                                     alignment=Qt.AlignCenter)
-        filter_mode_layout.addWidget(self.filter_inclusive_button)
-        filter_mode_layout.addWidget(self.filter_exclusive_button)
-
-        filter_mode_frame.setLayout(filter_mode_layout)
 
         search_button = QToolButton(self)
         search_button.setText("Search")
@@ -100,33 +80,30 @@ class Filter(QFrame):
                                    alignment=Qt.AlignRight)
         filter_area_grid.addWidget(self.map_name_entry, 2, 2)
         filter_area_grid.addWidget(self.description_entry, 4, 2)
-        filter_area_grid.addWidget(filter_mode_frame, 1, 3, 4, 1)
         filter_area_grid.addWidget(search_button, 1, 4, 4, 1)
 
         self.setLayout(filter_area_grid)
 
     def _get_filter_values(self):
         res = namedtuple("FilterValues", "type,size,name,descr")
-        return res(self.game_version_selection.currentText(),
-                   self.size_selection.currentText(),
+        game_ver = [self.game_version_selection.currentText()]
+        if game_ver[0] == "Any":
+            game_ver = constants.MAP_TYPE.values()
+        map_size = [self.size_selection.currentText()]
+        if map_size[0] == "Any":
+            map_size = constants.MAP_SIZE.values()
+        return res(game_ver, map_size,
                    self.map_name_entry.text(), self.description_entry.text())
 
     def apply(self, maps_list):
         filter_values = self._get_filter_values()
         res = []
         for map_item in maps_list:
-            if self.filter_inclusive_button.isChecked():
-                if (map_item.type == filter_values.type
-                        and constants.MAP_SIZE[map_item.size] == filter_values.size
-                        and filter_values.name.lower() in map_item.name.lower()
-                        and filter_values.descr.lower() in map_item.description.lower()):
-                    res.append(map_item)
-            elif self.filter_exclusive_button.isChecked():
-                if (map_item.type == filter_values.type
-                        or constants.MAP_SIZE[map_item.size] == filter_values.size
-                        or filter_values.name.lower() in map_item.name.lower()
-                        or filter_values.descr.lower() in map_item.description.lower()):
-                    res.append(map_item)
+            if (map_item.type in filter_values.type
+                    and constants.MAP_SIZE[map_item.size] in filter_values.size
+                    and filter_values.name.lower() in map_item.name.lower()
+                    and filter_values.descr.lower() in map_item.description.lower()):
+                res.append(map_item)
         return res
 
 
@@ -141,6 +118,7 @@ class MainWindow(QWidget):
         self.source_dir = None
         self.destination_dir = None
         self.init_ui()
+        self.center()
 
     def init_ui(self):
         self.setWindowTitle("Heroes 3 maps cataloguer")
@@ -180,8 +158,16 @@ class MainWindow(QWidget):
         main_grid.addWidget(self.overwrite_checkbox, 4, 0)
         main_grid.addWidget(self.export_button, 5, 0, alignment=Qt.AlignLeft)
         main_grid.addWidget(quit_button, 5, 1, alignment=Qt.AlignRight)
-
         self.setLayout(main_grid)
+
+    def center(self):
+        width = QDesktopWidget().availableGeometry().size().width() // 100 * 75
+        height = QDesktopWidget().availableGeometry().size().height() // 100 * 75
+        self.setGeometry(0, 0, width, height)
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
     def disable_entry(self, widget):
         back_colour = self.palette().color(QPalette.Background)
@@ -239,21 +225,33 @@ class MainWindow(QWidget):
         font.setBold(True)
         self.maps_table.horizontalHeader().setFont(font)
         self.maps_table.setSelectionMode(QAbstractItemView.NoSelection)
-        ## Get desired cell contents:
-        ## self.maps_table.item(1, 3)
         for row_number, row in enumerate(self.filtered_maps_list):
-            row_checker = QCheckBox(self.maps_table)
-            row_checker.stateChanged.connect(
-                lambda x, y=row_checker, z=row_number:
-                self.select_map(checkbutton=y, number=z))
+            row_checker = self._table_widget(row_number)
+            map_size = constants.MAP_SIZE[row.size]
+            underground = "Yes" if row.dungeon else "No"
             self.maps_table.setCellWidget(row_number, 0, row_checker)
             self.maps_table.setItem(row_number, 1, TableCell(row.name))
             self.maps_table.setItem(row_number, 2, TableCell(row.description))
-            self.maps_table.setItem(row_number, 3, TableCell(str(row.size)))
+            self.maps_table.setItem(row_number, 3, TableCell(map_size))
             self.maps_table.setItem(row_number, 4, TableCell(row.type))
-            self.maps_table.setItem(row_number, 5, TableCell(row.dungeon))
+            self.maps_table.setItem(row_number, 5, TableCell(underground))
             self.maps_table.setItem(row_number, 6, TableCell(str(row.players.total)))
             self.maps_table.setItem(row_number, 7, TableCell(str(row.players.humans)))
+        self.maps_table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+        self.maps_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.maps_table.resizeRowsToContents()
+        self.maps_table.resizeColumnsToContents()
+
+    def _table_widget(self, row_number):
+        frame = QFrame(self.maps_table)
+        row_checker = QCheckBox(frame)
+        row_checker.stateChanged.connect(
+            lambda x, y=row_checker, z=row_number:
+            self.select_map(checkbutton=y, number=z))
+        layout = QHBoxLayout()
+        layout.addWidget(row_checker, alignment=Qt.AlignCenter)
+        frame.setLayout(layout)
+        return frame
 
     def select_map(self, checkbutton, number):
         if checkbutton.isChecked():
