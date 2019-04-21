@@ -193,7 +193,8 @@ class MainWindow(QWidget):
             return res
 
     def select_source_directory(self):
-        source_dir = self._select_directory("Source directory")
+        #source_dir = self._select_directory("Source directory")
+        source_dir = "/home/user1/games/Heroes of Might and Magic III/Maps/"
         if source_dir:
             self.source_dir = source_dir
             self.source_path_entry.setText(self.source_dir)
@@ -201,7 +202,7 @@ class MainWindow(QWidget):
             self.fill_table()
 
     def collect_maps(self):
-        """"""
+        """Parse maps data."""
         progress = ProgressWindow(self, self.source_dir)
         files_aggregator = self.aggregator(self.source_dir)
         files_list = files_aggregator.get_files()

@@ -1,9 +1,9 @@
-import sys
 import os
 import shutil
 import gzip
 import binascii
 from collections import namedtuple
+from traceback import format_exc
 
 import constants
 
@@ -39,8 +39,8 @@ class FilesAggregator:
                 file = MapFile(path)
             except MapFileError:
                 pass
-            except MapContentsError:
-                self.broken_maps.append(path)
+            except MapContentsError as err:
+                self.broken_maps.append(err)
             else:
                 self.maps[path] = file
                 yield file
@@ -134,9 +134,8 @@ class MapFile:
         ### Debug
         try:
             return int(to_hex, 16)
-        except Exception as err:
-            print(str(err) + self.path)
-            sys.exit()
+        except ValueError:
+            self._log_exception_data()
 
     def _parse_main_data(self):
         self._unpack()
@@ -144,11 +143,13 @@ class MapFile:
         self.type = self._locate_data(4, constants.MAP_TYPE)
         # Determine where to start reading next data:
         if self.type == "HotA":
+            #raise MapContentsError("Skipped")
             hero_exists = self._bytes_to_dec(1)
             if hero_exists:
                 self._offset = 6
             else:
                 self._offset = 4
+            #self._offset = 6
         # Get map size:
         self._offset += 5
         self.size = self._bytes_to_dec(4)
@@ -163,7 +164,10 @@ class MapFile:
         # Get map name:
         length = self._bytes_to_dec(4)
         self._offset += 4
-        self.name = self._read(length).decode("cp1251")
+        try:
+            self.name = self._read(length).decode("cp1251")
+        except UnicodeDecodeError:
+            self._log_exception_data()
         self._offset += length
         # Get map description:
         length = self._bytes_to_dec(4)
@@ -219,3 +223,9 @@ class MapFile:
 
     def _get_teams(self):
         pass
+
+    def _log_exception_data(self):
+        mess = "\n===[ERROR]===\n{}\nPath: {}\nName: {}\nType: {}\nSize: {}\nDungeon: {}\n". \
+            format(format_exc(), self.path, self.name, self.type, self.size,
+                   self.dungeon)
+        raise MapContentsError(mess)
