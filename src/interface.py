@@ -139,6 +139,9 @@ class MainWindow(QWidget):
         self.filter = Filter(self, self.fill_table)
 
         self.maps_table = QTableWidget(self)
+        self.maps_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.maps_table.customContextMenuRequested.connect(self._table_context_menu)
+
         self.move_checkbox = QCheckBox(self)
         self.move_checkbox.setText(
             "Remove selected maps from source directory on export")
@@ -238,6 +241,9 @@ class MainWindow(QWidget):
             self.maps_table.setItem(row_number, 5, TableCell(underground))
             self.maps_table.setItem(row_number, 6, TableCell(str(row.players.total)))
             self.maps_table.setItem(row_number, 7, TableCell(str(row.players.humans)))
+            for column in range(1, 8):
+                cell = self.maps_table.item(row_number, column)
+                cell.setToolTip(row.path)
         self.maps_table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         self.maps_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.maps_table.resizeRowsToContents()
@@ -262,10 +268,22 @@ class MainWindow(QWidget):
         self.export_button.setEnabled(True if len(self.selected_map_files) > 0
                                       else False)
 
+    def _table_context_menu(self, position):
+        cell = self.maps_table.itemAt(position)
+        if cell:
+            menu = QMenu()
+            copy_action = QAction("Copy path to clipboard", self)
+            menu.addAction(copy_action)
+            action = menu.exec_(self.maps_table.mapToGlobal(position))
+            if action == copy_action:
+                row_number = cell.row()
+                clipboard = QApplication.clipboard()
+                clipboard.setText(self.filtered_maps_list[row_number].path)
+
 
 class TableCell(QTableWidgetItem):
-    def __init__(self, *a, **k):
-        super().__init__(*a, **k)
+    def __init__(self, *a):
+        super().__init__(*a)
         self.setFlags(Qt.ItemIsSelectable)
         self.setForeground(QBrush(QColor(0, 0, 0)))
 
